@@ -19,4 +19,3 @@ Python Requester.py --search_term MRI --search_type Procedure --search_zip 37221
 > Alternatively, you can run the Selenium Version as seen below:
 
 Python SeleniumVersion.py --search_term MRI --search_type Procedure --search_zip 37221
-

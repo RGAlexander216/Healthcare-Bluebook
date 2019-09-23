@@ -4,6 +4,7 @@ import os.path
 import json
 import lxml
 import re
+import xlsxwriter
 from collections import OrderedDict
 from copy import deepcopy
 from time import sleep
@@ -27,6 +28,7 @@ class Requester(object):
     SET_ZIP_URL = f'{HBB_URL}/api/HcbbUI/GetZipLocation'
     IDENT_URL = f'{HBB_URL}/api/HcbbUI/CheckIdentCookie'
     TYPE_AHEAD_URL = f'{HBB_URL}/api/HcbbUI/getTypeAheadLists'
+    GET_LOG_URL = f'{HBB_URL}/api/HcbbUI/Log'
     PROC_DETAIL_UI_URL = f'{HBB_URL}/ui/proceduredetails'
     PROC_DETAIL_API_URL = f'{HBB_URL}/api/HcbbUI/GetProcedureDetails'
     SEARCH_TYPES = {'Procedure': '1', 'Doctor': '2', 'Hospital': '3'}
@@ -70,7 +72,7 @@ class Requester(object):
                 were provided by the user. i.e. search_term if the input matches more than 
                 one category available on the site.
         """
-        sleep(2)
+        sleep(1)
         if params is None:
             params = {}
         response = self.session.request(url=url, method=method, params=params)
@@ -126,7 +128,30 @@ class Requester(object):
                 else:
                     break
     
-    def perform_search(self):
+    def export_fair_priced_procedure_data(self):
+        """ The main tool to perform a data export for procedures at or below a fair price
+        """
+        response = self._perform_search()
+        self.price = self.__define_fair_price(response)
+        df = DataFrame(response.json())
+        writer = pandas.ExcelWriter(os.path.abspath(os.path.join('.','Results',self.search_term+'.xlsx')),
+                            engine='xlsxwriter')
+        df = DataFrame(DataFrame([resp['ProcedureDetails']['FacilityInformation']])['Facilities'][0])
+        df = df[(df['CashPriceSortValue'] <= self.price) & (df['CashPriceSortValue'] > 0)]
+        df.to_excel(excel_writer=writer, sheet_name=r.search_term)
+        writer.save()
+        
+        print(fr'Your Results Have Been Saved in the Excel Workbook Found Here: {writer.path}')
+        return df
+    
+    def __define_fair_price(self, response):
+        """ Get the floating point value of a "Fair" Procedure Price
+        """
+        df = DataFrame(response.json())
+        price = df['ProcedureDetails']['PricingInformations'][0]['FairPrice'].replace('$','')
+        return float(price)
+    
+    def _perform_search(self):
         """ Retrieve the HTML Consumer Front User Interface HTML
                 Returns as an BeatifulSoup (LXML) Markup Object
                 
@@ -161,7 +186,7 @@ class Requester(object):
                                          method='GET',
                                          params={'GetZipList': 'true'},
                                          call_before_return=self.__check_valid_input)
-        response = self._execute_request(url='https://www.healthcarebluebook.com/api/HcbbUI/Log',
+        response = self._execute_request(url=self.GET_LOG_URL,
                                          method='GET',
                                          params=self.__define_log_params())
         response = self._execute_request(url=self.PROC_DETAIL_UI_URL+f'/{self.search_term_id}',
@@ -193,5 +218,5 @@ if __name__ == '__main__':
         search_args = parser.parse_known_args()[0]
     
     r = Requester(search_args)
-    resp = r.perform_search()
+    resp = r.export_fair_priced_procedure_data()
     
