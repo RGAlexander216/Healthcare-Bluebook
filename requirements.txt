@@ -1,8 +1,9 @@
 beautifulsoup4==4.8.0
-bs4==0.0.1
 chromedriver-binary==77.0.3865.40.0
+IPython==7.7.0
 lxml==4.4.1
 numpy==1.17.0
 pandas==0.25.1
 requests==2.22.0
 selenium==3.141.0
+XlsxWriter==1.1.9
