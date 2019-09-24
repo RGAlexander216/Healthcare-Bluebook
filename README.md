@@ -12,10 +12,3 @@ pip install -r requirements.txt
 
 Python Requester.py --search_term MRI --search_type Procedure --search_zip 37221 
 
-> You'll see output of the URLs and some of the JSON response output
-
-> ################################################################################
-
-> Alternatively, you can run the Selenium Version as seen below:
-
-Python SeleniumVersion.py --search_term MRI --search_type Procedure --search_zip 37221
