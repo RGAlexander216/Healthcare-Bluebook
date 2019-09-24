@@ -8,7 +8,12 @@
 
 pip install -r requirements.txt
 
-> Then start the main script by running the next line
+> Then start the main script by running the next line. Note that if you don't
+> provide an exact match you will be prompted to enter the ID of the procedure
+> to retrieve data for. 
 
 Python Requester.py --search_term MRI --search_type Procedure --search_zip 37221 
 
+> This will output all the data for the "green" locations for whichever procedure
+> is provided into an XLSX file held in the Results folder
+> downloaded/created by running the above command.
