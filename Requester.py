@@ -42,34 +42,49 @@ class Requester(object):
         """
         self.session = requests.Session()
         self.search_args = search_args
-        self.search_term = search_args.search_term
-        self.search_type_input = search_args.search_type
-        self.search_type = self.SEARCH_TYPES[search_args.search_type]
-        self.search_zip = search_args.search_zip
-        self.search_term_id = None
+        self.term = search_args.search_term.replace('-',' ')
+        self.type_input = search_args.search_type
+        self.type = self.SEARCH_TYPES[search_args.search_type]
+        self.zip_code = search_args.zip_code
+        self.term_id = None
         self.__update_session_headers()
     
     def export_fair_priced_procedure_data(self):
         """ The main tool to perform a data export for procedures at or below a fair price
         """
-        response = self._perform_search()
-        self.price = self.__define_fair_price(response)
-        file_path = os.path.join('.','Results',self.search_term+'.xlsx')
-        if not path.exists(path.dirname(file_path)):
-            os.makedirs(path.dirname(file_path))
-        writer = pandas.ExcelWriter(os.path.abspath(file_path),
-                                    engine='xlsxwriter')
-        df = DataFrame(response.json())
-        df = DataFrame([df['ProcedureDetails']['FacilityInformation']])
-        df = DataFrame(df['Facilities'][0])               
-        df = df[df['CostIndicator'] == 1]
-        df.to_excel(excel_writer=writer, sheet_name='Fair Priced Procedures')
-        writer.save()
-        print(f'Your Results Have Been Saved in the Excel '+\
-              f'Workbook Found Here: {writer.path}')
-        return df
+        responses = list(self._perform_search().values())
+        terms = self.term.split(',')
+        
+        for response_idx in range(responses.__len__()):
+            response = responses[response_idx]
+            term = terms[response_idx]
+            df = DataFrame(response.json())
+            if df['ProcedureDetails']['DisplayCaptcha'] is False:
+                df = DataFrame([df['ProcedureDetails']['FacilityInformation']])
+                df = DataFrame(df['Facilities'][0])               
+                df = df[df['CostIndicator'] == 1]
+
+                file_path = path.join('.','Results',term+'.xlsx')
+                init_file = path.join(path.dirname(file_path), '__init__.py')
+                if not path.exists(path.dirname(file_path)):
+                    os.makedirs(path.dirname(file_path))
+                if not path.exists(init_file):
+                    with open(init_file,'x') as file:
+                        pass
+                writer = pandas.ExcelWriter(os.path.abspath(file_path),
+                                            engine='xlsxwriter')
+                df.to_excel(excel_writer=writer,
+                            sheet_name='Fair Priced Procedures',
+                            index=False)
+                writer.save()
+                print(f'Your Results Have Been Saved in the Excel '+\
+                      f'Workbook Found Here: {writer.path}')
+            else:
+                print(f'reCAPTCHA Requested for {term}')
+                continue
             
-    def _execute_request(self, url, method='GET', params=None, call_before_return=None):
+    def _execute_request(self, url, method='GET', params=None, 
+                         call_before_return=None, sleep_seconds=2.5):
         """ Class Universal Request Method,
                 Rate Limits the period between consecutive requests to 1 second
                 
@@ -79,7 +94,7 @@ class Requester(object):
                 were provided by the user. i.e. search_term if the input matches  
                 more than one category available on the site.
         """
-        sleep(1.5)
+        sleep(sleep_seconds)
         if params is None:
             params = {}
         response = self.session.request(url=url, method=method, params=params)
@@ -96,44 +111,52 @@ class Requester(object):
                 non-physician, non-medicare price rates by internally calling
                 the Requester.__set_marketplace_medicare_false() method
         """
-        response = self._execute_request(url=self.CONSUMER_URL,
-                                         method='GET',
-                                         params={})
-        response = self._execute_request(url=self.SEARCH_UI_URL,
-                                         method='GET',
-                                         params={'SearchTerms': self.search_term,
-                                                 'Tab': 'ShopForCare'})
-        response = self._execute_request(url=self.APP_INIT_URL,
-                                         method='GET',
-                                         params={})
-        response = self._execute_request(url=self.TYPE_AHEAD_URL,
-                                         method='GET',
-                                         params={'GetZipList': 'true'},
-                                         call_before_return=self.__check_valid_input)
-        response = self._execute_request(url=self.OTHER_VISITOR_URL,
-                                         method='GET',
-                                         params={'Medicare': 'false'})
-        response = self._execute_request(url=self.SET_ZIP_URL,
-                                         method='GET',
-                                         params={'request.ZipCode': str(self.search_zip)})
-        response = self._execute_request(url=self.IDENT_URL,
-                                         method='GET',
-                                         params={})
-        response = self._execute_request(url=self.TYPE_AHEAD_URL,
-                                         method='GET',
-                                         params={'GetZipList': 'true'},
-                                         call_before_return=self.__check_valid_input)
-        response = self._execute_request(url=self.GET_LOG_URL,
-                                         method='GET',
-                                         params=self.__define_log_params())
-        response = self._execute_request(url=self.PROC_DETAIL_UI_URL+f'/{self.search_term_id}',
-                                         method='GET',
-                                         params={})
-        response = self._execute_request(url=self.PROC_DETAIL_API_URL,
-                                         method='GET',
-                                         params={'Language': 'en',
-                                                 'CftId': self.search_term_id})
-        return response
+        term_index = 0
+        responses = OrderedDict()
+        
+        self._execute_request(url=self.CONSUMER_URL,
+                              method='GET',
+                              params={})
+        self._execute_request(url=self.SEARCH_UI_URL,
+                              method='GET',
+                              params={'SearchTerms': self.term,
+                                      'Tab': 'ShopForCare'})
+        self._execute_request(url=self.APP_INIT_URL,
+                              method='GET')
+        self._execute_request(url=self.OTHER_VISITOR_URL,
+                              method='GET',
+                              params={'Medicare': 'false'})
+        self._execute_request(url=self.SET_ZIP_URL,
+                              method='GET',
+                              params={'request.ZipCode': str(self.zip_code)})
+        self._execute_request(url=self.IDENT_URL,
+                              method='GET',
+                              params={})
+        self._execute_request(url=self.TYPE_AHEAD_URL,
+                              method='GET',
+                              params={'GetZipList': 'true'},
+                              call_before_return=self.__check_valid_input)
+        self._execute_request(url=self.GET_LOG_URL,
+                              method='GET',
+                              params=self.__define_log_params())
+        for term_id in self.term_id.split(','):
+            term = self.term.split(',')[term_index]
+            print(f'Retreiving Data For {self.type_input} {term}.')
+            self._execute_request(url=self.SEARCH_UI_URL,
+                                  method='GET',
+                                  params={'SearchTerms': term,
+                                          'Tab': 'ShopForCare'},
+                                  sleep_seconds=3.5)
+            url = self.PROC_DETAIL_UI_URL+f'/{term_id}'
+            self._execute_request(url=url, method='GET')
+            response = self._execute_request(url=self.PROC_DETAIL_API_URL,
+                                     method='GET',
+                                     params={'Language': 'en',
+                                             'CftId': term_id},
+                                     sleep_seconds=3.5)
+            responses[term_id] = response
+            term_index += 1
+        return responses
     
     def __update_session_headers(self, response=None):
         """ If `response` is None this will update the user-agent header for the
@@ -148,16 +171,56 @@ class Requester(object):
             response = self.session.get(url=self.SEARCH_UI_URL)
         else:
             copy_response = deepcopy(response)
-            while True:
-                if 'Set-Cookie' in copy_response.headers.keys() and loop_count == 0:
-                    loop_count += 1
-                    header = copy_response.headers.pop('Set-Cookie')
-                    try:
-                        self.session.headers['Cookie'] += '; '+header
-                    except (KeyError):
-                        self.session.headers['Cookie'] = header
+            if 'Set-Cookie' in copy_response.headers.keys() and loop_count == 0:
+                loop_count += 1
+                header = copy_response.headers.pop('Set-Cookie')
+                try:
+                    self.session.headers['Cookie'] += '; '+header
+                except (KeyError):
+                    self.session.headers['Cookie'] = header
+        
+    def __check_valid_input(self, response):
+        match_func = lambda x: re.search(self.term, x) is not None
+        df = DataFrame(response.json()).T
+        df = DataFrame(df['Procedures']['TypeAheadLists'])
+        df['Match'] = df['DisplayNameEnglish'].apply(match_func)
+        match_df = df[df['Match'] == True][['DisplayNameEnglish','ProcedureId']]
+        if match_df.index.__len__() > 1:
+            match_df.sort_values(by='DisplayNameEnglish', inplace=True)
+            match_qty = match_df.index.__len__()
+            print(f'\nThere are {match_qty} Matches for "{self.term}".\n'+\
+                  f'Do You Want to Retreive Information for All '+\
+                  f'Matching {self.type_input} or Select the '+\
+                  f'{self.term} from the List of Matching {self.type_input}s?\n')
+            sleep(0.2)
+            all_or_one = input(f'Type "A" for All, Otherwise Leave Blank:\n').upper()
+            if all_or_one == 'A':
+                print('WARNING: This process may trigger reCAPTCHA requests.\n'+\
+                      'Extra wait times are will be used to reduce the '+\
+                      'Chances of this happening, however, this may still '+\
+                      'be insufficient.\n\nAny Results Obtained Will Be Provided '+\
+                      'and you will be notified which data requests failed.')
+                self.term = ''
+                self.term_id = ''
+                for term_id in dict(match_df.values).values():
+                    new_df = match_df[match_df['ProcedureId'] == int(term_id)]
+                    self.term += new_df['DisplayNameEnglish'].values[0]
+                    self.term_id += str(term_id)
+                    if term_id != tuple(dict(match_df.values).values())[-1]:
+                        self.term += ','
+                        self.term_id += ','
+            else:
+                for k,v in dict(match_df.values).items():
+                    print(f'{self.type_input} {v}: {k}')
+                self.term_id = input(f'Enter {self.type_input} ID:')
+                if int(self.term_id) in match_df['ProcedureId'].tolist():
+                    new_df = match_df[match_df['ProcedureId'] == int(self.term_id)]
+                    self.term = new_df['DisplayNameEnglish'].values[0]
                 else:
-                    break
+                    print(f'The {self.type_input} ID Provided was not '+\
+                          f'found in the list provided.\nPlease Enter a Valid '+\
+                          f'{self.type_input} ID')
+        return response
     
     def __define_log_params(self):
         """ Request Done within the Browser to Obtain Some Specific Session Cookies
@@ -174,57 +237,16 @@ class Requester(object):
             "request.language":"en"}
         return params
     
-    def __define_fair_price(self, response):
-        """ Get the floating point value of a "Fair" Procedure Price
-        """
-        df = DataFrame(response.json())
-        if df['ProcedureDetails']['DisplayCaptcha'] is False:
-            df = df['ProcedureDetails']['PricingInformations']
-            price = df[0]['FairPrice']
-            price = price.replace('$','')
-            price = price.replace(',','')
-            return float(price)
-        else:
-            raise SystemExit('Unfortunately The Site Is Requesting A '+\
-                             'User Answer a reCAPTCHA image for human '+\
-                             'Verification. This Cannot Be Bypassed Until'+\
-                             'A New Session is Created or The Current IP '+\
-                             'Address has Changed.')
-        
-    def __check_valid_input(self, response):
-        match_func = lambda x: re.search(self.search_term, x) is not None
-        df = DataFrame(response.json()).T
-        df = DataFrame(df['Procedures']['TypeAheadLists'])
-        df['Match'] = df['DisplayNameEnglish'].apply(match_func)
-        match_df = df[df['Match'] == True][['DisplayNameEnglish','ProcedureId']]
-        if match_df.index.__len__() > 1:
-            match_df.sort_values(by='DisplayNameEnglish', inplace=True)
-            for k,v in dict(match_df.values).items():
-                print(f'{self.search_type_input} {v}: {k}')
-            print(f'\nThere are Multiple Matches for {self.search_term}.\n'+\
-                  f'Please Enter the Number from the list above Corresponding '+\
-                  f'to the desired {self.search_type_input}.')
-            while True:
-                self.search_term_id = int(input(f'\nEnter {self.search_type_input} ID: '))
-                if self.search_term_id in match_df['ProcedureId'].tolist():
-                    break
-                else:
-                    print(f'The {self.search_type_input} ID Provided was not '+\
-                          f'found in the list provided.\nPlease Enter a Valid '+\
-                          f'{self.search_type_input} ID')
-            new_df = match_df[match_df['ProcedureId'] == self.search_term_id]
-            self.search_term = new_df['DisplayNameEnglish'].values[0]
-        return response
         
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('-s', '--search_term', type=str,
-                        help='Search Term, Use double-quotes for terms with spaces',
+                        help='Search Term, Use a dash in place of spaces',
                         default='MRI')
     parser.add_argument('-t', '--search_type', type=str,
                         help='Search Type (Procedure, Doctor, Hospital)',
                         default='Procedure')
-    parser.add_argument('-z', '--search_zip', type=int,
+    parser.add_argument('-z', '--zip_code', type=int,
                         help='Search Zip Code',
                         default=37221)
     try:
@@ -235,4 +257,3 @@ if __name__ == '__main__':
     
     r = Requester(search_args)
     r.export_fair_priced_procedure_data()
-    
