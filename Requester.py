@@ -180,6 +180,12 @@ class Requester(object):
                     self.session.headers['Cookie'] = header
         
     def __check_valid_input(self, response):
+        """ This is an internally-called validation check on the users input at the command line.
+            
+            This is where the determination is going to be made about the potential
+            data the user is trying to obtain from the site and requests for clarification of 
+            the user's initial input is going to be requested.
+        """
         match_func = lambda x: re.search(self.term, x) is not None
         df = DataFrame(response.json()).T
         df = DataFrame(df['Procedures']['TypeAheadLists'])
