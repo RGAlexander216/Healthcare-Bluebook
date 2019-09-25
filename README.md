@@ -13,7 +13,7 @@ pip install -r requirements.txt
 > to retrieve data for or to pull all matches' data from the site. It's important 
 > to be aware that if you hit "A" when prompted to pull all matches that if it says
 > there were a significant amount of matches it can only be stopped by a Keyboard
-> Interrupt by the user. There is a 10 second wait for this process to be done, but
+> Interrupt by the user. There is a 11.5 second wait for this process to be done, but
 > that alone may not prevent the the site from requesting the reCAPTCHA.
 
 > The `search_term` below is Case Sensitive, so if you type "arm mri" you won't receive
