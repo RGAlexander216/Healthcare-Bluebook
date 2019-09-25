@@ -16,7 +16,7 @@ pip install -r requirements.txt
 > Interrupt by the user. There is a 11.5 second wait for this process to be done, but
 > that alone may not prevent the the site from requesting the reCAPTCHA.
 
-> The `search_term` below is Case Sensitive, so if you type "arm mri" you won't receive
+> The `search_term` below is Case and word-order sensitive , so if you type "arm mri" you won't receive
 > any matches. This should be a future change in functionality as it requires the user 
 > navigate through the same pages to see if they've got it in the right case or order.
 > Essentially, this case & order sensitivity is a problem that minimizes the utility
