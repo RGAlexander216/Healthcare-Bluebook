@@ -148,7 +148,7 @@ class Requester(object):
                                           'Tab': 'ShopForCare'},
                                   sleep_seconds=3.5)
             url = self.PROC_DETAIL_UI_URL+f'/{term_id}'
-            self._execute_request(url=url, method='GET')
+            self._execute_request(url=url, method='GET', sleep_seconds=3.5)
             response = self._execute_request(url=self.PROC_DETAIL_API_URL,
                                      method='GET',
                                      params={'Language': 'en',
